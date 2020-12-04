@@ -1,9 +1,11 @@
 # Latest edit April 15, 2019: bug fixes, added lpb
+import extcolors
 import requests
 import time as t
 import spotipy.util as util
 import random
-
+import urllib
+import PIL
 global spotify_token, client_id, client_secret, lifx_token, colors, username, lpb, firstColor
 colors = []
 client_id = ""
@@ -63,11 +65,17 @@ def play_song():
     duration = song_info[1]  # in
     current_id = song_info[2]
     name = song_info[3]
+    image_url = song_info[4]
+    urllib.request.urlretrieve(image_url, "image.png")
+    img = PIL.Image.open("image.png")
 
+    colors2, pixel_count = extcolors.extract_from_image(img)
     print("Track Title: " + str(name))
     print("Current Track ID: " + str(current_id))
     print("BPM: " + str(round(bpm, 2)))
     print("Lights Per Beat (can be changed in metronomeconfig.txt): " + str(lpb))
+    print('rgb:'+str(colors2[0][0][0])+","+str(colors2[0][0][1])+","+str(colors2[0][0][2]))
+    print(colors2[1][0])
 
     # Get total beats in song, and time for period of pulse
     totalbeats = (duration / 60) * bpm
@@ -76,9 +84,9 @@ def play_song():
 
     # Make lights pulse to beat, have two colors change every beat
     data = {
-        "color": str(firstColor),
+        "color": 'rgb:'+str(colors2[1][0][0])+","+str(colors2[1][0][1])+","+str(colors2[1][0][2]),
         "period": (time * 2),
-        "from_color": str(secondColor),
+        "from_color": 'rgb:'+str(colors2[0][0][0])+","+str(colors2[0][0][1])+","+str(colors2[0][0][2]),
         "cycles": ((totalbeats / 2) * lpb),
         "power_on": "true",
         "persist": "true"
@@ -105,6 +113,8 @@ def play_song():
             print('TypeError')
             play_song()
 
+def track_image():
+    pass
 
 def stop_lights(color):
     params = {
@@ -152,11 +162,14 @@ def get_current_song():
     idandname = get_song_id()
     id = idandname[0]
     name = idandname[1]
-    get_song = requests.get("https://api.spotify.com/v1/audio-analysis/{}".format(id), headers=header)
-    song_info = get_song.json()
-    tempo = song_info["track"]["tempo"]
-    duration = song_info["track"]["duration"]
-    return [tempo, duration, id, name]
+    get_song_analysis = requests.get("https://api.spotify.com/v1/audio-analysis/{}".format(id), headers=header)
+    get_song_info = requests.get("https://api.spotify.com/v1/tracks/{}".format(id), headers=header)
+    song_analysis = get_song_analysis.json()
+    song_info = get_song_info.json()
+    tempo = song_analysis["track"]["tempo"]   
+    duration = song_analysis["track"]["duration"]
+    image_url = song_info["album"]["images"][0]["url"]
+    return [tempo, duration, id, name, image_url]
 
 
 def spotify_authenticate():
